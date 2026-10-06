@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guitarra F·J</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#0e0b1a;--fg:#f4f0ff;--a:#ff4d8d;--b:#38d9ff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none;-webkit-user-select:none}
+#wrap{position:relative;width:100%;max-width:420px;padding:8px}
+#hud{display:flex;justify-content:space-between;font-weight:700;padding:4px 6px;font-size:15px}
+canvas{width:100%;height:auto;display:block;border-radius:14px;background:#161030}
+#menu{position:absolute;inset:44px 8px 8px;background:rgba(14,11,26,.94);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:10px;text-align:center;padding:16px;overflow-y:auto}
+#menu h1{margin:0;font-size:26px}
+#menu p{margin:0 0 6px;opacity:.8;font-size:14px}
+button{font:inherit;cursor:pointer;border:0;color:#fff}
+.song{background:#2a2050;padding:12px 18px;border-radius:12px;width:100%;font-weight:600;border:2px solid transparent}
+.song:hover{border-color:var(--b)}
+#pads{display:flex;gap:10px;width:100%;margin-top:8px}
+.pad{flex:1;height:64px;border-radius:14px;font-size:26px;font-weight:800;touch-action:manipulation}
+#pf{background:var(--a)}#pj{background:var(--b);color:#0e0b1a}
+.pad:active,.pad.on{filter:brightness(1.3);transform:scale(.97)}
+small{opacity:.6;margin-top:6px}
+</style></head><body>
+<div id="wrap">
+  <div id="hud"><span>Pontos: <b id="sc">0</b></span><span>Combo: <b id="cb">0</b></span><span id="ti"></span></div>
+  <canvas id="c" width="420" height="560"></canvas>
+  <div id="pads"><button class="pad" id="pf">F</button><button class="pad" id="pj">J</button></div>
+  <div style="text-align:center"><small>Acerte as notas com <b>F</b> e <b>J</b> para tocar a música</small></div>
+  <div id="menu"></div>
+</div>
+<script>
+const SONGS=[
+ {n:'🎵 Ode à Alegria',bpm:100,d:1,s:'64 64 65 67 67 65 64 62 60 60 62 64 64*1.5 62*.5 62*2 64 64 65 67 67 65 64 62 60 60 62 64 62*1.5 60*.5 60*2'},
+ {n:'⭐ Brilha, Brilha Estrelinha',bpm:110,d:1,s:'60 60 67 67 69 69 67*2 65 65 64 64 62 62 60*2 67 67 65 65 64 64 62*2 67 67 65 65 64 64 62*2 60 60 67 67 69 69 67*2 65 65 64 64 62 62 60*2'},
+ {n:'🔥 Für Elise (difícil)',bpm:92,d:.5,s:'76 75 76 75 76 71 74 72 69*1.5 60*.5 64 69 71*1.5 64*.5 68 71 72*1.5 64*.5 76 75 76 75 76 71 74 72 69*1.5 60*.5 64 69 71*1.5 64*.5 72 71 69*2'},
+ {n:'🎸 Riff Rock em Mi (original)',bpm:150,d:.5,s:'E3 E3 G3 E3 A3*1.5 E3*.5 B3 A3 G3 E3*2 E3 E3 G3 E3 A3*1.5 E3*.5 D4 B3 A3 E3*2'},
+ {n:'🤘 Power Rock (original)',bpm:140,d:.5,s:'A2 A2 C3 A2 D3*1.5 A2*.5 E3 D3 C3 A2*2 A2 A2 C3 A2 E3*1.5 A2*.5 G3 E3 D3 A2*2'},
+ {n:'⚡ Solo Pentatônico (original)',bpm:130,d:.5,s:'A4 C5 D5 D#5 E5 G5*1.5 E5*.5 D5 C5 A4*2 C5 D5 E5 G5 A5*2 G5 E5 D5 C5 A4*2'},
+ {n:'👑 Hall of the Mountain King (Grieg)',bpm:120,d:.5,s:'B3 C#4 D4 E4 F#4 D4 F#4*2 F4 C#4 F4*2 E4 C4 E4*2 B3 C#4 D4 E4 F#4 D4 F#4 B4 A4 F#4 D4 F#4 A4*3'},
+ {n:'⚔️ 5ª Sinfonia (Beethoven)',bpm:110,d:1,s:'G4*.5 G4*.5 G4*.5 Eb4*2.5 F4*.5 F4*.5 F4*.5 D4*2.5 G4*.5 G4*.5 G4*.5 Eb4*2.5 G4*.5 G4*.5 G4*.5 Bb4*2.5'},
+ {n:'🎄 Jingle Bells',bpm:130,d:1,s:'E4 E4 E4*2 E4 E4 E4*2 E4 G4 C4*1.5 D4*.5 E4*4 F4 F4 F4*1.5 F4*.5 F4 E4 E4 E4*.5 E4*.5 E4 D4 D4 E4 D4*2 G4*2'},
+ {n:'🎂 Parabéns pra Você',bpm:110,d:1,s:'G4*.75 G4*.25 A4 G4 C5 B4*2 G4*.75 G4*.25 A4 G4 D5 C5*2 G4*.75 G4*.25 G5 E5 C5 B4 A4 F5*.75 F5*.25 E5 C5 D5 C5*2'},
+ {n:'🌿 Greensleeves',bpm:120,d:1,s:'A4 C5*2 D5 E5*1.5 F5*.5 E5 D5*2 B4 G4*1.5 A4*.5 B4 C5*2 A4 A4*1.5 G#4*.5 A4 B4*2 G#4 E4*2'},
+ {n:'🎻 Canon em Ré (Pachelbel)',bpm:100,d:1,s:'F#5 E5 D5 C#5 B4 A4 B4 C#5 D5 C#5 B4 A4 G4 F#4 G4 E4 F#5*.5 F#5*.5 E5 D5 C#5 B4 A4 B4 C#5*2'}
+];
+const cv=document.getElementById('c'),x=cv.getContext('2d'),W=420,H=560,HIT=470,TR=1.7,WIN=.2,LX=[140,280];
+let ac,cache={},notes=[],t0=0,run=false,score=0,combo=0,best=0,hits=0,fb=null,flash=[0,0],song=null,endT=0;
+const $=id=>document.getElementById(id);
+
+function pluck(m,v=.7){
+  const f=440*2**((m-69)/12);let b=cache[m];
+  if(!b){const sr=ac.sampleRate,n=sr*1.8|0,N=Math.round(sr/f);b=ac.createBuffer(1,n,sr);const d=b.getChannelData(0);
+    for(let i=0;i<N;i++)d[i]=Math.random()*2-1;
+    for(let i=N;i<n;i++)d[i]=(d[i-N]+d[i-N+1])*.498;
+    cache[m]=b}
+  const s=ac.createBufferSource();s.buffer=b;
+  const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=3500;
+  const g=ac.createGain();g.gain.value=v;
+  s.connect(lp).connect(g).connect(ac.destination);s.start();
+}
+
+function dead(){
+  const sr=ac.sampleRate,n=sr*.14|0,b=ac.createBuffer(1,n,sr),d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n)**2;
+  const s=ac.createBufferSource();s.buffer=b;
+  const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=450;
+  const g=ac.createGain();g.gain.value=1;s.connect(f).connect(g).connect(ac.destination);s.start();
+  const o=ac.createOscillator(),og=ac.createGain(),t=ac.currentTime;
+  o.type='sawtooth';o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(65,t+.16);
+  og.gain.setValueAtTime(.18,t);og.gain.exponentialRampToValueAtTime(.001,t+.2);
+  o.connect(og).connect(ac.destination);o.start(t);o.stop(t+.22);
+}
+function toMidi(p){
+  if(/^\d+$/.test(p))return +p;
+  const m=/^([A-Ga-g])([#b]?)(-?\d)$/.exec(p);if(!m)return NaN;
+  const base={c:0,d:2,e:4,f:5,g:7,a:9,b:11}[m[1].toLowerCase()];
+  return 12*(+m[3]+1)+base+(m[2]==='#'?1:m[2]==='b'?-1:0);
+}
+function build(sg){
+  const sec=60/sg.bpm;let t=0,lane=0,prev=null;const out=[];
+  sg.s.trim().split(/\s+/).forEach(k=>{
+    const [p,l]=k.split('*'),m=toMidi(p),b=l?+l:sg.d;
+    if(isNaN(m))return;
+    if(prev!==null){if(m>prev)lane=1;else if(m<prev)lane=0}
+    out.push({t:2.2+t,m,lane,done:0});
+    t+=b*sec;prev=m;
+  });
+  return out;
+}
+
+function menu(res){
+  const m=$('menu');m.style.display='flex';
+  m.innerHTML='<h1>Guitarra F·J</h1>'+(res?res:'<p>Notas descem pela corda. Aperte <b>F</b> (esquerda) ou <b>J</b> (direita) quando chegarem na linha. Cada acerto toca a próxima nota da música!</p>')
+   +SONGS.map((s,i)=>`<button class="song" data-i="${i}">${s.n}</button>`).join('');
+  m.insertAdjacentHTML('beforeend','<p style="margin-top:8px">🎼 <b>Sua música</b>: escreva notas (ex: E4 E4 F4*2 G4) ou números MIDI. <code>*2</code> = 2 tempos.</p><textarea id="cs" rows="3" style="width:100%;border-radius:10px;padding:8px;background:#1d1640;color:#fff;border:1px solid #555;font:inherit" placeholder="E4 E4 F4 G4 G4 F4 E4 D4*2"></textarea><div style="display:flex;gap:8px;width:100%"><input id="bp" type="number" value="100" min="50" max="200" style="width:80px;border-radius:10px;padding:8px;background:#1d1640;color:#fff;border:1px solid #555"><button class="song" id="cu">Tocar minha música</button></div>');
+  m.querySelectorAll('.song[data-i]').forEach(b=>b.onclick=()=>start(+b.dataset.i));
+  $('cu').onclick=()=>{const t=$('cs').value.trim();if(t)start({n:'🎼 Minha música',bpm:+$('bp').value||100,d:1,s:t})};
+}
+
+function start(i){
+  if(!ac)ac=new (window.AudioContext||window.webkitAudioContext)();
+  ac.resume();
+  song=typeof i==='object'?i:SONGS[i];notes=build(song);
+  score=combo=best=hits=0;fb=null;
+  endT=notes[notes.length-1].t+1.5;
+  t0=ac.currentTime;run=true;
+  $('menu').style.display='none';$('ti').textContent=song.n.slice(2);upd();
+}
+
+function upd(){$('sc').textContent=score;$('cb').textContent=combo}
+function say(t,c){fb={t,c,at:performance.now()}}
+
+function press(l){
+  if(!run)return;
+  flash[l]=performance.now();
+  const now=ac.currentTime-t0;let bn=null,bd=9;
+  for(const n of notes){if(n.lane!==l||n.done)continue;const d=Math.abs(n.t-now);if(d<WIN&&d<bd){bn=n;bd=d}}
+  if(bn){
+    bn.done=1;bn.hit=1;hits++;pluck(bn.m);
+    const per=bd<.08;
+    score+=Math.round((per?100:60)*(1+Math.min(combo,30)/10));
+    combo++;best=Math.max(best,combo);
+    say(per?'Perfeito!':'Bom','#38d9ff');
+  }else{combo=0;dead();say('Errou!','#ff4d8d')}
+  upd();
+}
+
+function loop(){
+  requestAnimationFrame(loop);
+  const now=run?ac.currentTime-t0:0,ts=performance.now();
+  x.clearRect(0,0,W,H);
+  // cordas
+  LX.forEach((cx,i)=>{
+    const g=x.createLinearGradient(cx-50,0,cx+50,0);
+    g.addColorStop(0,'#1d1640');g.addColorStop(.5,i?'#1a2c4a':'#3a1a3f');g.addColorStop(1,'#1d1640');
+    x.fillStyle=g;x.fillRect(cx-60,0,120,H);
+    x.fillStyle='#d8d4ee';x.fillRect(cx-1.5,0,3,H);
+  });
+  // trastes
+  x.strokeStyle='rgba(255,255,255,.07)';x.lineWidth=2;
+  const off=run?(now*120)%80:0;
+  for(let y=-80+off;y<H;y+=80){x.beginPath();x.moveTo(60,y);x.lineTo(360,y);x.stroke()}
+  // linha de acerto
+  LX.forEach((cx,i)=>{
+    const on=ts-flash[i]<120,col=i?'#38d9ff':'#ff4d8d';
+    x.lineWidth=4;x.strokeStyle=col;x.globalAlpha=on?1:.55;
+    x.beginPath();x.arc(cx,HIT,32,0,7);x.stroke();
+    if(on){x.fillStyle=col;x.globalAlpha=.35;x.fill()}
+    x.globalAlpha=.8;x.fillStyle='#fff';x.font='bold 16px system-ui';x.textAlign='center';
+    x.fillText(i?'J':'F',cx,HIT+60);x.globalAlpha=1;
+  });
+  if(run){
+    for(const n of notes){
+      if(!n.done&&now-n.t>WIN){n.done=1;combo=0;dead();say('Perdeu','#ff4d8d');upd()}
+      if(n.hit)continue;
+      const y=HIT-(n.t-now)*(HIT/TR);
+      if(y<-40||y>H+40)continue;
+      const col=n.lane?'#38d9ff':'#ff4d8d';
+      x.fillStyle=col;x.shadowColor=col;x.shadowBlur=14;
+      x.beginPath();x.arc(LX[n.lane],y,28,0,7);x.fill();x.shadowBlur=0;
+      x.fillStyle=n.lane?'#0e0b1a':'#fff';x.font='bold 22px system-ui';x.textAlign='center';
+      x.fillText(n.lane?'J':'F',LX[n.lane],y+8);
+    }
+    if(now>endT)finish();
+  }
+  if(fb&&ts-fb.at<500){x.globalAlpha=1-(ts-fb.at)/500;x.fillStyle=fb.c;x.font='bold 26px system-ui';x.textAlign='center';x.fillText(fb.t,W/2,HIT-90);x.globalAlpha=1}
+}
+
+function finish(){
+  run=false;
+  const pct=Math.round(hits/notes.length*100),st=pct>=95?'⭐⭐⭐':pct>=75?'⭐⭐':pct>=50?'⭐':'🎸';
+  menu(`<p style="font-size:34px;margin:0">${st}</p><p><b>${pct}%</b> de acertos (${hits}/${notes.length})<br>Pontos: <b>${score}</b> · Maior combo: <b>${best}</b></p>`);
+}
+
+addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const k=e.key.toLowerCase();
+  if(k==='f'){press(0);$('pf').classList.add('on')}
+  if(k==='j'){press(1);$('pj').classList.add('on')}
+});
+addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k==='f')$('pf').classList.remove('on');if(k==='j')$('pj').classList.remove('on')});
+$('pf').addEventListener('pointerdown',e=>{e.preventDefault();press(0)});
+$('pj').addEventListener('pointerdown',e=>{e.preventDefault();press(1)});
+menu();loop();
+</script></body></html>
